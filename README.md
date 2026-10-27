@@ -1,5 +1,7 @@
 # dsh-deploy
 
+> **要重装服务器？** 看 [REINSTALL.md](REINSTALL.md) —— 含备份、部署、恢复、验收的完整步骤。
+
 DeepSeek Harness (dsh) 的一键部署脚本（幂等，可重复执行）。
 
 ```bash

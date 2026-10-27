@@ -35,12 +35,84 @@ die()  { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "请用 root 运行（sudo bash install.sh）"
 
+
+# ── 0. 基础环境（干净系统也能一把跑完）────────────────────────────────
+say "检测系统与包管理器"
+PKG=""
+if command -v apt-get >/dev/null 2>&1; then PKG=apt
+elif command -v dnf      >/dev/null 2>&1; then PKG=dnf
+elif command -v yum      >/dev/null 2>&1; then PKG=yum
+elif command -v apk      >/dev/null 2>&1; then PKG=apk
+fi
+[[ -n "$PKG" ]] || warn "未识别的包管理器，基础工具需要你手动装（curl git openssl xz tar）"
+
+pkg_install() {
+  case "$PKG" in
+    apt) apt-get update -y -qq >/dev/null 2>&1 || true; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@" ;;
+    dnf) dnf install -y "$@" ;;
+    yum) yum install -y "$@" ;;
+    apk) apk add --no-cache "$@" ;;
+    *)   return 0 ;;
+  esac
+}
+
+if [[ -n "$PKG" ]]; then
+  say "安装基础工具（curl / git / openssl / xz / tar）"
+  case "$PKG" in
+    apt) pkg_install curl git openssl xz-utils tar ca-certificates >/dev/null 2>&1 || warn "基础工具安装有警告" ;;
+    *)   pkg_install curl git openssl xz tar ca-certificates >/dev/null 2>&1 || warn "基础工具安装有警告" ;;
+  esac
+fi
+
+# 时区：定时/日志/心跳的安静时段都依赖它
+if command -v timedatectl >/dev/null 2>&1; then
+  CURRENT_TZ="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+  if [[ "$CURRENT_TZ" != "${TZ_NAME:-Asia/Shanghai}" ]]; then
+    say "设置时区 ${TZ_NAME:-Asia/Shanghai}（当前 ${CURRENT_TZ:-unknown}）"
+    timedatectl set-timezone "${TZ_NAME:-Asia/Shanghai}" 2>/dev/null || warn "时区设置失败，可手动 timedatectl set-timezone"
+  fi
+fi
+
+# swap：dsh + QQ + 浏览器渲染很容易吃满小内存机器
+MEM_MB="$(free -m | awk '/Mem:/{print $2}')"
+if ! swapon --show 2>/dev/null | grep -q . && [[ "${MEM_MB:-0}" -lt "${SWAP_BELOW_MB:-4096}" ]]; then
+  say "内存 ${MEM_MB}MB，创建 ${SWAP_SIZE:-2G} swap"
+  fallocate -l "${SWAP_SIZE:-2G}" /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count="${SWAP_COUNT:-2048}" status=none
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null 2>&1 || true
+  swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+else
+  say "swap 已存在或内存充足，跳过"
+fi
+
 # ── 1. Node 与 dsh ─────────────────────────────────────────────────────
 say "检查 Node 版本"
 NODE_BIN="$(command -v node || true)"
-[[ -n "$NODE_BIN" ]] || die "没找到 node。请先装 Node 22+（推荐 NodeSource 或 nvm）"
-NODE_MAJOR="$("$NODE_BIN" -v | sed 's/^v//' | cut -d. -f1)"
-[[ "$NODE_MAJOR" -ge 22 ]] || die "Node 版本太低（当前 $(node -v)，需要 >= 22）"
+
+need_node=0
+if [[ -z "$NODE_BIN" ]]; then
+  need_node=1
+else
+  NODE_MAJOR="$("$NODE_BIN" -v | sed 's/^v//' | cut -d. -f1)"
+  [[ "$NODE_MAJOR" -ge 22 ]] || need_node=1
+fi
+
+if [[ "$need_node" == "1" ]]; then
+  NODE_VER="${NODE_VER:-v22.14.0}"
+  say "安装 Node $NODE_VER（官方二进制到 /usr/local）"
+  mkdir -p /usr/local/lib/nodejs
+  curl -fsSL "https://nodejs.org/dist/$NODE_VER/node-$NODE_VER-linux-x64.tar.xz" -o /tmp/node.tar.xz \
+    || die "Node 下载失败，检查网络或改 NODE_VER"
+  tar -xJf /tmp/node.tar.xz -C /usr/local/lib/nodejs
+  NODE_DIR="/usr/local/lib/nodejs/node-$NODE_VER-linux-x64"
+  ln -sf "$NODE_DIR/bin/node" /usr/local/bin/node
+  ln -sf "$NODE_DIR/bin/npm"  /usr/local/bin/npm
+  ln -sf "$NODE_DIR/bin/npx"  /usr/local/bin/npx
+  hash -r
+  NODE_BIN="$(command -v node)"
+  say "Node 已就绪：$("$NODE_BIN" -v)"
+fi
 
 NPM_BIN="$(command -v npm || true)"
 [[ -n "$NPM_BIN" ]] || die "没找到 npm"
@@ -119,6 +191,11 @@ fi
 
 # ── 6. nginx 反代（可选） ─────────────────────────────────────────────
 NGINX_BIN="$(command -v nginx || true)"
+if [[ -z "$NGINX_BIN" && -n "$PKG" && "${WITH_NGINX:-1}" == "1" ]]; then
+  say "安装 nginx"
+  pkg_install nginx >/dev/null 2>&1 || warn "nginx 安装失败，将退化为只监听 127.0.0.1"
+  NGINX_BIN="$(command -v nginx || true)"
+fi
 if [[ -n "$NGINX_BIN" ]]; then
   say "配置 nginx 反代 :$PUBLIC_PORT → 127.0.0.1:$DSH_PORT"
 

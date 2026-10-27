@@ -50,6 +50,9 @@ fi
 
 # ── 改 web profile 的 package.json ────────────────────────────────────
 say "登记到 web profile 的 bundles"
+PLUGIN_NAMES=(dsh-agent-md dsh-heartbeat-inner)
+[[ "$WITH_QQ" == "1" ]] && PLUGIN_NAMES+=(dsh-qq)
+
 node -e '
 const fs = require("fs");
 const [file, ...names] = process.argv.slice(1);
@@ -64,13 +67,16 @@ for (const name of names) {
 }
 fs.writeFileSync(file, JSON.stringify(j, null, 2) + "\n");
 console.log("bundles:", j.dsh.profile.bundles.join(", "));
-' "$WEB_PROFILE/package.json" dsh-agent-md dsh-heartbeat-inner ${WITH_QQ:+$([[ "$WITH_QQ" == "1" ]] && echo dsh-qq)}
+' "$WEB_PROFILE/package.json" "${PLUGIN_NAMES[@]}"
 
 # ── 心跳配置 ─────────────────────────────────────────────────────────
 PATCH="$WEB_PROFILE/cordis.patch.yml"
 if [[ -d "$PLUGINS_DIR/dsh-heartbeat-inner" ]] && ! grep -q "id: heartbeat" "$PATCH" 2>/dev/null; then
   say "追加 heartbeat 配置"
   THINK_PORT=3002
+  # 装了 QQ 插件就用它的 profile（共用常驻会话），否则退回 sdk
+  if [[ -d "$DSH_HOME/profiles/qq" ]]; then HB_PROFILE=qq; else HB_PROFILE=sdk; fi
+  say "心跳将使用 profile: $HB_PROFILE"
   # 如果跑过 install-qq.sh，就把 OneBot 地址和你自己的号自动填进来
   QQ_CRED="${QQ_CRED:-/www/wwwroot/dsh.qq.credentials.txt}"
   HB_WS=""
@@ -99,7 +105,7 @@ if [[ -d "$PLUGINS_DIR/dsh-heartbeat-inner" ]] && ! grep -q "id: heartbeat" "$PA
     dailyMax: 5
     cwd: "${WORKSPACE:-/root}"
     dshBin: "$(command -v dsh)"
-    profile: qq          # 和 QQ 插件共用同一个常驻会话
+    profile: ${HB_PROFILE}
     thinkUrl: "http://127.0.0.1:$THINK_PORT"
     channel:
       kind: onebot
