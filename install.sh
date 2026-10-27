@@ -118,9 +118,24 @@ if [[ "$need_node" == "1" ]]; then
   ln -sf "$NODE_DIR/bin/node" /usr/local/bin/node
   ln -sf "$NODE_DIR/bin/npm"  /usr/local/bin/npm
   ln -sf "$NODE_DIR/bin/npx"  /usr/local/bin/npx
+
+  # 让新开的终端也认识 node（/usr/local/bin 通常已在 PATH，但保险起见）
+  cat > /etc/profile.d/nodejs.sh <<'PROFILE'
+export PATH=/usr/local/bin:$PATH
+PROFILE
+  chmod 644 /etc/profile.d/nodejs.sh
+
   hash -r
   NODE_BIN="$(command -v node)"
   say "Node 已就绪：$("$NODE_BIN" -v)"
+fi
+
+# npm 的全局 prefix 必须指向 /usr/local，否则 dsh 会装进 node 包内目录、不在 PATH 里
+if [[ "$(npm config get prefix 2>/dev/null)" != "/usr/local" ]]; then
+  say "设置 npm 全局目录为 /usr/local（否则 dsh 命令找不到）"
+  npm config set prefix /usr/local >/dev/null 2>&1 || warn "npm prefix 设置失败"
+fi
+export PATH="/usr/local/bin:$PATH"
 fi
 
 NPM_BIN="$(command -v npm || true)"
@@ -132,9 +147,23 @@ else
   say "安装 @deepseek-ai/dsh"
   "$NPM_BIN" install -g @deepseek-ai/dsh
 fi
-DSH_BIN="$(command -v dsh)" || die "dsh 安装后仍找不到可执行文件"
+DSH_BIN="$(command -v dsh || true)"
+if [[ -z "$DSH_BIN" ]]; then
+  # 兜底：直接去 npm 的 bin 目录里找，软链到 /usr/local/bin
+  NPM_PREFIX="$(npm config get prefix 2>/dev/null || echo /usr/local)"
+  if [[ -x "$NPM_PREFIX/bin/dsh" ]]; then
+    ln -sf "$NPM_PREFIX/bin/dsh" /usr/local/bin/dsh
+    hash -r
+    DSH_BIN="/usr/local/bin/dsh"
+  elif [[ -x "/usr/local/lib/nodejs/node-${NODE_VER:-v22.14.0}-linux-x64/bin/dsh" ]]; then
+    ln -sf "/usr/local/lib/nodejs/node-${NODE_VER:-v22.14.0}-linux-x64/bin/dsh" /usr/local/bin/dsh
+    hash -r
+    DSH_BIN="/usr/local/bin/dsh"
+  fi
+fi
+[[ -n "$DSH_BIN" ]] || die "dsh 装完但找不到可执行文件。手动查：ls $(npm config get prefix)/bin | grep dsh"
 NODE_DIR="$(dirname "$NODE_BIN")"
-export PATH="$NODE_DIR:$PATH"
+export PATH="$NODE_DIR:/usr/local/bin:$PATH"
 
 # ── 2. 工作区 ──────────────────────────────────────────────────────────
 say "准备工作区 $WORKSPACE"
