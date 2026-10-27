@@ -264,8 +264,18 @@ if [[ -n "$NGINX_BIN" ]]; then
   printf '%s:%s\n' "$AUTH_USER" "$(openssl passwd -apr1 "$AUTH_PASS")" > /www/wwwroot/dsh.htpasswd
   { echo "USER=$AUTH_USER"; echo "PASS=$AUTH_PASS"; } > "$CRED_FILE"
   chmod 600 "$CRED_FILE"
+  # 密码文件必须让 nginx 的 worker 用户读得到，否则 401 会变成 500
+  NGINX_USER="$(ps -o user= -C nginx 2>/dev/null | head -1 | tr -d ' ')"
+  [[ -z "$NGINX_USER" ]] && NGINX_USER="$(awk '/^user /{gsub(";","");print $2}' /etc/nginx/nginx.conf 2>/dev/null | head -1)"
+  [[ -z "$NGINX_USER" ]] && NGINX_USER="www-data"
   chmod 640 /www/wwwroot/dsh.htpasswd
-  chown root:www /www/wwwroot/dsh.htpasswd 2>/dev/null || true
+  if chown "root:$NGINX_USER" /www/wwwroot/dsh.htpasswd 2>/dev/null; then
+    say "密码文件归属 root:$NGINX_USER（nginx 可读）"
+  else
+    chmod 644 /www/wwwroot/dsh.htpasswd
+    warn "找不到 nginx 用户 $NGINX_USER，密码文件改为 644"
+  fi
+  chmod 755 /www/wwwroot 2>/dev/null || true
 
   if [[ -f "$CONF_FILE" ]]; then
     cp "$CONF_FILE" "$CONF_FILE.bak.$(date +%Y%m%d%H%M%S)"
