@@ -136,7 +136,6 @@ if [[ "$(npm config get prefix 2>/dev/null)" != "/usr/local" ]]; then
   npm config set prefix /usr/local >/dev/null 2>&1 || warn "npm prefix 设置失败"
 fi
 export PATH="/usr/local/bin:$PATH"
-fi
 
 NPM_BIN="$(command -v npm || true)"
 [[ -n "$NPM_BIN" ]] || die "没找到 npm"
