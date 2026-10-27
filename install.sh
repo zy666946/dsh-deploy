@@ -60,6 +60,11 @@ pkg_install() {
   esac
 }
 
+if [[ -n "$PKG" && "$PKG" != "apt" && "$PKG" != "apk" ]]; then
+  say "启用 EPEL（部分软件源需要）"
+  pkg_install epel-release >/dev/null 2>&1 || warn "EPEL 启用失败（可能已启用）"
+fi
+
 if [[ -n "$PKG" ]]; then
   say "安装基础工具（curl / git / openssl / xz / tar）"
   case "$PKG" in
@@ -197,7 +202,10 @@ fi
 NGINX_BIN="$(command -v nginx || true)"
 if [[ -z "$NGINX_BIN" && -n "$PKG" && "${WITH_NGINX:-1}" == "1" ]]; then
   say "安装 nginx"
-  pkg_install nginx >/dev/null 2>&1 || warn "nginx 安装失败，将退化为只监听 127.0.0.1"
+  if ! pkg_install nginx; then
+    warn "nginx 安装失败（上面是真实报错）。常见原因：CentOS 没启用 EPEL、软件源不可用"
+    warn "你仍然可以用 SSH 隧道访问：ssh -L $PUBLIC_PORT:127.0.0.1:$DSH_PORT root@$PUBLIC_HOST"
+  fi
   NGINX_BIN="$(command -v nginx || true)"
 fi
 if [[ -n "$NGINX_BIN" ]]; then
@@ -267,7 +275,17 @@ server {
 }
 NGINX
 
-  "$NGINX_BIN" -t && ("$NGINX_BIN" -s reload || systemctl reload nginx) && say "nginx 已重载"
+  # 关键：nginx 可能刚装好但还没启动过，此时 -s reload 会失败（没有 master 进程）
+  if ! systemctl is-active --quiet nginx 2>/dev/null; then
+    say "启动 nginx"
+    systemctl enable --now nginx 2>/dev/null || "$NGINX_BIN" || warn "nginx 启动失败"
+    sleep 2
+  fi
+  if "$NGINX_BIN" -t >/dev/null 2>&1; then
+    ("$NGINX_BIN" -s reload || systemctl reload nginx) >/dev/null 2>&1 && say "nginx 已重载" || warn "nginx 重载失败"
+  else
+    warn "nginx 配置检查失败：$("$NGINX_BIN" -t 2>&1 | tail -3)"
+  fi
 else
   warn "没装 nginx：dsh 只监听 127.0.0.1:$DSH_PORT，请用 SSH 隧道访问"
   warn "  ssh -L $PUBLIC_PORT:127.0.0.1:$DSH_PORT 你的用户@这台机器"
@@ -286,8 +304,18 @@ fi
 say "启动 dsh"
 systemctl daemon-reload
 systemctl enable --now dsh
-sleep 6
-systemctl is-active --quiet dsh || die "dsh 没起来，查看：journalctl -u dsh -n 50 或 tail -n 50 $LOG_FILE"
+say "等待 dsh 启动（首次要初始化 profile，最多 90 秒）…"
+READY=0
+for i in $(seq 1 45); do
+  if systemctl is-active --quiet dsh && ss -lnt 2>/dev/null | grep -q ":$DSH_PORT"; then READY=1; break; fi
+  sleep 2
+done
+if [[ "$READY" != "1" ]]; then
+  warn "dsh 暂时没起来，最近日志："
+  tail -n 20 "$LOG_FILE" 2>/dev/null | sed 's/^/    /'
+  warn "排查：journalctl -u dsh -n 50"
+  die "dsh 启动失败（先把上面的日志发我看）"
+fi
 
 TOKEN="$(grep -o 'token=[A-Za-z0-9_-]*' "$LOG_FILE" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
 
