@@ -104,12 +104,13 @@ if [[ -z "$NODE_BIN" ]]; then
   need_node=1
 else
   NODE_MAJOR="$("$NODE_BIN" -v | sed 's/^v//' | cut -d. -f1)"
-  [[ "$NODE_MAJOR" -ge 22 ]] || need_node=1
+  # dsh 的 CLI 用了 import.meta.main（Node 24.2+），22 会静默不执行
+  [[ "$NODE_MAJOR" -ge 24 ]] || need_node=1
 fi
 
 if [[ "$need_node" == "1" ]]; then
-  NODE_VER="${NODE_VER:-v22.14.0}"
-  say "安装 Node $NODE_VER（官方二进制到 /usr/local）"
+  NODE_VER="${NODE_VER:-v24.15.0}"
+  say "安装 Node $NODE_VER（dsh 需要 24+，官方二进制到 /usr/local）"
   mkdir -p /usr/local/lib/nodejs
   curl -fsSL "https://nodejs.org/dist/$NODE_VER/node-$NODE_VER-linux-x64.tar.xz" -o /tmp/node.tar.xz \
     || die "Node 下载失败，检查网络或改 NODE_VER"
@@ -154,13 +155,22 @@ if [[ -z "$DSH_BIN" ]]; then
     ln -sf "$NPM_PREFIX/bin/dsh" /usr/local/bin/dsh
     hash -r
     DSH_BIN="/usr/local/bin/dsh"
-  elif [[ -x "/usr/local/lib/nodejs/node-${NODE_VER:-v22.14.0}-linux-x64/bin/dsh" ]]; then
+  elif [[ -x "/usr/local/lib/nodejs/node-${NODE_VER:-v24.15.0}-linux-x64/bin/dsh" ]]; then
     ln -sf "/usr/local/lib/nodejs/node-${NODE_VER:-v22.14.0}-linux-x64/bin/dsh" /usr/local/bin/dsh
     hash -r
     DSH_BIN="/usr/local/bin/dsh"
   fi
 fi
 [[ -n "$DSH_BIN" ]] || die "dsh 装完但找不到可执行文件。手动查：ls $(npm config get prefix)/bin | grep dsh"
+
+# 冒烟测试：dsh 的 CLI 依赖 import.meta.main，Node 版本不够会「静默退出、退出码 0」
+smoke="$("$DSH_BIN" --version 2>&1 || true)"
+if [[ -z "$smoke" ]]; then
+  warn "dsh --version 没有任何输出 —— 通常是 Node 版本不够（需要 24.2+）"
+  warn "当前 node: $("$NODE_BIN" -v)，dsh: $DSH_BIN"
+  die "请升级 Node 到 24+ 后重跑本脚本（NODE_VER=v24.15.0）"
+fi
+say "dsh 自检通过：$smoke"
 NODE_DIR="$(dirname "$NODE_BIN")"
 export PATH="$NODE_DIR:/usr/local/bin:$PATH"
 
