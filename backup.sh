@@ -75,8 +75,8 @@ say "生成还原清单"
   echo "## 文件"
   echo "- dsh-home.tar.gz   : 人格 / profile 配置 / 会话 / 插件 / API Key"
   echo "- web-config.tar.gz : 密码文件 / polyfill / systemd / nginx"
-  [[ -f "$DEST/qq-login.tar.gz" ]] && echo "- qq-login.tar.gz   : QQ 登录态（还原后可能免扫码）"
-  [[ "${WITH_WORKSPACE:-0}" == "1" ]] && echo "- workspace.tar.gz  : 工作区文件"
+  if [[ -f "$DEST/qq-login.tar.gz" ]]; then echo "- qq-login.tar.gz   : QQ 登录态（还原后可能免扫码）"; fi
+  if [[ "${WITH_WORKSPACE:-0}" == "1" ]]; then echo "- workspace.tar.gz  : 工作区文件"; fi
   echo
   echo "## 还原步骤"
   echo '```bash'

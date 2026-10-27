@@ -51,7 +51,7 @@ fi
 # ── 改 web profile 的 package.json ────────────────────────────────────
 say "登记到 web profile 的 bundles"
 PLUGIN_NAMES=(dsh-agent-md dsh-heartbeat-inner)
-[[ "$WITH_QQ" == "1" ]] && PLUGIN_NAMES+=(dsh-qq)
+if [[ "$WITH_QQ" == "1" ]]; then PLUGIN_NAMES+=(dsh-qq); fi
 
 node -e '
 const fs = require("fs");
@@ -85,7 +85,7 @@ if [[ -d "$PLUGINS_DIR/dsh-heartbeat-inner" ]] && ! grep -q "id: heartbeat" "$PA
     QQ_TOKEN="$(sed -n 's/^TOKEN=//p' "$QQ_CRED" | head -1)"
     QQ_OWNER="$(sed -n 's/^OWNER=//p' "$QQ_CRED" | head -1)"
     ONEBOT_PORT="${ONEBOT_PORT:-3001}"
-    [[ -n "$QQ_TOKEN" ]] && HB_WS="ws://127.0.0.1:$ONEBOT_PORT?access_token=$QQ_TOKEN"
+    if [[ -n "$QQ_TOKEN" ]]; then HB_WS="ws://127.0.0.1:$ONEBOT_PORT?access_token=$QQ_TOKEN"; fi
     HB_TARGET="$QQ_OWNER"
     say "已从 $QQ_CRED 读到 OneBot 配置（目标 QQ: ${HB_TARGET:-未设置}）"
   fi

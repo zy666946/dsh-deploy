@@ -184,7 +184,7 @@ say "启动 NapCat（首次需要扫码登录）"
 systemctl enable --now napcat
 say "等待二维码（最多 60 秒）…"
 for i in $(seq 1 60); do
-  [[ -f "$NAPCAT_DIR/napcat/cache/qrcode.png" ]] && break
+  if [[ -f "$NAPCAT_DIR/napcat/cache/qrcode.png" ]]; then break; fi
   sleep 1
 done
 
