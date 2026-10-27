@@ -41,6 +41,14 @@ tar czf "$DEST/web-config.tar.gz" -C / \
   www/server/panel/vhost/nginx/dsh.conf \
   2>/dev/null || warn "部分文件不存在（正常，取决于你装了什么）"
 
+# ── 2.5 QQ 登录态（有的话，重装后可能免扫码）──────────────────────────
+if [[ -d /root/.config/QQ && "${WITH_QQ_LOGIN:-1}" == "1" ]]; then
+  say "打包 QQ 登录态 /root/.config/QQ（约 $(du -sh /root/.config/QQ 2>/dev/null | cut -f1)）"
+  tar czf "$DEST/qq-login.tar.gz" -C / root/.config/QQ 2>/dev/null || warn "QQ 登录态打包失败（重新扫码即可）"
+else
+  warn "跳过 QQ 登录态（重装后需要重新扫码）"
+fi
+
 # ── 3. 工作区文件（可选，可能很大）────────────────────────────────────
 if [[ "${WITH_WORKSPACE:-0}" == "1" ]]; then
   say "打包工作区 ${WORKSPACE:-/www/wwwroot/龙虾/dsh-workspace}"
@@ -67,6 +75,7 @@ say "生成还原清单"
   echo "## 文件"
   echo "- dsh-home.tar.gz   : 人格 / profile 配置 / 会话 / 插件 / API Key"
   echo "- web-config.tar.gz : 密码文件 / polyfill / systemd / nginx"
+  [[ -f "$DEST/qq-login.tar.gz" ]] && echo "- qq-login.tar.gz   : QQ 登录态（还原后可能免扫码）"
   [[ "${WITH_WORKSPACE:-0}" == "1" ]] && echo "- workspace.tar.gz  : 工作区文件"
   echo
   echo "## 还原步骤"
