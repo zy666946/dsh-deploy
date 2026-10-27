@@ -63,7 +63,7 @@ PUBLIC_HOST=你的服务器公网IP \
 
 ### 它会自己做完这些（你什么都不用管）
 
-1. 装 Node.js（跑 dsh 需要）
+1. 装 Node.js **24**（dsh 用了 Node 24.2+ 才有的 API，22 会“启动成功但秒退”）
 2. 装 nginx（做反向代理 + 密码保护）
 3. 如果内存小，自动开 2G 虚拟内存（swap），防止卡死
 4. 设置时区为中国时间
@@ -292,6 +292,35 @@ free -h          # 看内存和 swap
 dsh + QQ 协议端大概要 1~1.5G 内存。2G 机器必须开 swap（脚本会自动开）。
 
 实在不够就升级配置，或者不装 QQ。
+
+### dsh 起来了但马上又停了 / 日志一片空白
+
+九成是 **Node 版本不够**。dsh 的入口用了 `import.meta.main`（Node 24.2+），
+用 Node 22 时它会**静默退出、退出码 0、连日志都不写**，看起来像“启动成功”。
+
+```bash
+node -v        # 必须 v24.x
+dsh --version  # 必须有输出；没输出就是这个原因
+```
+
+修：
+
+```bash
+# 重跑 install.sh 会自动装 Node 24 并重装 dsh
+PUBLIC_HOST=你的IP bash <(curl -fsSL https://raw.githubusercontent.com/zy666946/dsh-deploy/main/install.sh)
+```
+
+### 网页 500（不是 401）
+
+密码文件权限不对，nginx 的 worker 用户读不到：
+
+```bash
+ls -l /www/wwwroot/dsh.htpasswd
+# 应该是 root:www-data（Debian/Ubuntu）或 root:www（宝塔/CentOS）
+chown root:www-data /www/wwwroot/dsh.htpasswd   # 按你的系统改
+chmod 640 /www/wwwroot/dsh.htpasswd
+nginx -s reload
+```
 
 ### 装到一半断了
 
