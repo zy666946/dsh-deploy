@@ -19,6 +19,10 @@ set -euo pipefail
 DSH_PORT="${DSH_PORT:-3080}"
 PUBLIC_PORT="${PUBLIC_PORT:-3081}"
 PUBLIC_HOST="${PUBLIC_HOST:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
+# 云服务器的 hostname -I 通常是内网地址，直接拿来拼访问链接会打不开
+if [[ "$PUBLIC_HOST" =~ ^(10\.|127\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.) ]]; then
+  printf '\033[1;33m[!]\033[0m 检测到内网地址 %s；若要从公网访问，请显式指定：PUBLIC_HOST=你的公网IP bash install.sh\n' "$PUBLIC_HOST"
+fi
 AUTH_USER="${AUTH_USER:-dsh}"
 CRED_FILE="${CRED_FILE:-/www/wwwroot/dsh.credentials.txt}"
 if [[ -z "${AUTH_PASS:-}" && -f "$CRED_FILE" ]]; then
