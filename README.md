@@ -1,4 +1,4 @@
-# 在服务器上养一个属于你自己的 干饭鱼
+# 在服务器上养一个属于你自己的 鲸鱼娘
 
 一套脚本，帮你在 Linux 服务器上把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）装好、配好、能远程用。
 
