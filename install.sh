@@ -265,10 +265,12 @@ if [[ -n "$NGINX_BIN" ]]; then
   { echo "USER=$AUTH_USER"; echo "PASS=$AUTH_PASS"; } > "$CRED_FILE"
   chmod 600 "$CRED_FILE"
   # 密码文件必须让 nginx 的 worker 用户读得到，否则 401 会变成 500
-  NGINX_USER="$(ps -o user= -C nginx 2>/dev/null | head -1 | tr -d ' ' || true)"
-  if [[ -z "$NGINX_USER" ]]; then
-    NGINX_USER="$(awk '/^user /{gsub(";","");print $2}' /etc/nginx/nginx.conf 2>/dev/null | head -1 || true)"
-  fi
+  NGINX_USER="$(awk '/^user /{gsub(";","");print $2}' /etc/nginx/nginx.conf 2>/dev/null | head -1 || true)"
+if [[ -z "$NGINX_USER" ]]; then
+  NGINX_USER="$(ps -o user= -C nginx 2>/dev/null | grep -vx root | head -1 | tr -d ' ' || true)"
+fi
+if [[ -z "$NGINX_USER" ]]; then NGINX_USER="www-data"; 
+fi
   if [[ -z "$NGINX_USER" ]]; then NGINX_USER="www-data"; fi
   chmod 640 /www/wwwroot/dsh.htpasswd
   if chown "root:$NGINX_USER" /www/wwwroot/dsh.htpasswd 2>/dev/null; then
