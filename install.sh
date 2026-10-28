@@ -369,6 +369,37 @@ fi
 
 TOKEN="$(grep -o 'token=[A-Za-z0-9_-]*' "$LOG_FILE" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
 
+# ── 部署后自检：别让用户自己去猜 500 ──────────────────────────────────
+say "部署后自检"
+SELFCHECK_FAIL=0
+if [[ -n "$NGINX_BIN" ]]; then
+  C1="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "http://127.0.0.1:$DSH_PORT/" 2>/dev/null || echo 000)"
+  C2="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "http://127.0.0.1:$PUBLIC_PORT/" 2>/dev/null || echo 000)"
+  echo "    直连 dsh :3080 → $C1"
+  echo "    经 nginx :$PUBLIC_PORT → $C2"
+  [[ "$C2" == "401" ]] || { SELFCHECK_FAIL=1; }
+  if [[ -n "$TOKEN" ]]; then
+    JAR="$(mktemp)"
+    C3="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 ${AUTH_USER:+} -u "$AUTH_USER:$AUTH_PASS" -c "$JAR" "http://127.0.0.1:$PUBLIC_PORT/?token=$TOKEN" 2>/dev/null || echo 000)"
+    C4="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -u "$AUTH_USER:$AUTH_PASS" -b "$JAR" "http://127.0.0.1:$PUBLIC_PORT/" 2>/dev/null || echo 000)"
+    echo "    token 换 cookie → $C3"
+    echo "    带 cookie 首页  → $C4"
+    [[ "$C4" == "200" ]] || SELFCHECK_FAIL=1
+    rm -f "$JAR"
+  fi
+  if [[ "$SELFCHECK_FAIL" == "1" ]]; then
+    warn "自检没全过，最近 nginx 错误："
+    for f in /var/log/nginx/dsh.error.log /var/log/nginx/error.log /www/wwwlogs/dsh.error.log; do
+      [[ -f "$f" ]] && grep -iE "error|crit|denied" "$f" 2>/dev/null | tail -5 | sed 's/^/    /' && break
+    done
+    warn "跑一下诊断脚本：bash <(curl -fsSL https://raw.githubusercontent.com/zy666946/dsh-deploy/main/doctor.sh)"
+  else
+    say "自检通过 ✅"
+  fi
+else
+  warn "没有 nginx，跳过 HTTP 自检"
+fi
+
 cat <<EOF
 
 ────────────────────────────────────────────────────────
