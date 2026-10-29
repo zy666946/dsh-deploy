@@ -3,15 +3,17 @@
 # dsh-deploy · 一键把 DeepSeek Harness 装上服务器
 #
 # 用法：
-#   PUBLIC_HOST=1.2.3.4 bash install.sh
-#   DEEPSEEK_API_KEY=sk-xxx PUBLIC_HOST=1.2.3.4 bash install.sh
+#   PUBLIC_HOST=1.2.3.4 bash install-lite.sh
+#
+# 装完在网页「设置 → 模型 → API 密钥」里填模型密钥即可，脚本不需要 key。
 #
 # 可选环境变量：
 #   PUBLIC_HOST        服务器公网 IP（不传则自动探测）
 #   PUBLIC_PORT        对外端口，默认 3081
 #   DSH_PORT           内部端口，默认 3080
 #   NODE_MAJOR         Node 大版本，默认 24（失败回退 22）
-#   DEEPSEEK_API_KEY   模型密钥（不传则装完后在网页里填）
+#   DEEPSEEK_API_KEY   模型密钥（可选；不建议写在命令行，会进 shell 历史。
+#                       留空则装完后在网页「设置 → 模型」里填）
 #   WITH_AUTH          1 = 额外加一层 Basic Auth，默认 0
 #   WORKSPACE          工作区目录，默认 /www/wwwroot/dsh-workspace
 # ============================================================
@@ -109,7 +111,8 @@ CRED
   chmod 600 "$DSH_HOME/.credentials.yaml"
   ok "已写入 API Key"
 else
-  warn "没传 DEEPSEEK_API_KEY，装完后在网页「设置 → 模型」里填"
+  echo "   下一步：打开网页 → 设置 → 模型 → API 密钥，粘贴后保存"
+  echo "   （页面会显示「API 密钥缺失」，填完变「已配置」）"
 fi
 
 # ── 7. profile 覆盖层（可选项都在这里） ─────────────────────

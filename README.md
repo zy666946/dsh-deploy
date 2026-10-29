@@ -32,11 +32,11 @@ PUBLIC_HOST=1.2.3.4 \
 
 ```bash
 PUBLIC_HOST=1.2.3.4 \
-DEEPSEEK_API_KEY=sk-你的key \
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/zy666946/dsh-deploy/main/install-lite.sh)"
 ```
 
-> `DEEPSEEK_API_KEY` 可以不给，装完在网页「设置 → 模型」里填。
+> 脚本**不需要** API Key。装完打开网页，在「设置 → 模型 → API 密钥」里填就行，
+> 比写在命令行里干净（不会进 shell 历史、不会出现在 `ps` 里）。
 
 ---
 
@@ -49,7 +49,7 @@ DEEPSEEK_API_KEY=sk-你的key \
 | `DSH_PORT` | ✅ 3080 | ✅ 3080 | 内部端口，只监听 127.0.0.1 |
 | `AUTH_USER` / `AUTH_PASS` | ✅ dsh / 随机 | — | Basic Auth 账号密码 |
 | `WITH_AUTH` | — | 默认 0 | 精简版里设为 1 才开 Basic Auth |
-| `DEEPSEEK_API_KEY` | 支持 | 支持 | 模型密钥 |
+| `DEEPSEEK_API_KEY` | — | 可选 | 模型密钥；**建议留空**，装完在网页里填 |
 | `WORKSPACE` | `/www/wwwroot/dsh-workspace` | 同左 | 工作区 |
 | `NODE_MAJOR` | 24 | 24（回退 22） | Node 大版本 |
 
@@ -65,6 +65,19 @@ http://1.2.3.4:3081/?token=xxxxxxxx
 
 1. 先点它（token 换 cookie，30 天有效）
 2. 之后收藏 `http://1.2.3.4:3081/` 就行
+
+### 配置模型 API Key（装完之后）
+
+脚本不碰密钥，装完自己填：
+
+1. 打开 `http://你的IP:3081/`
+2. 左下角 **设置 → 模型**
+3. 找到 **API 密钥**，粘贴你的 `sk-...`，保存
+4. 状态会从「API 密钥缺失」变成「API 密钥已配置」
+
+保存后落在 `$DSH_HOME/.credentials.yaml`（权限 600），重启不丢。
+
+> 为什么不在命令行传 key：会留在 shell 历史里，`ps` 也能看到，多一个泄露面。
 
 ### token 每次重启都会变
 
