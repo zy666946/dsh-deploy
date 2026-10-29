@@ -136,6 +136,24 @@ nginx 读不到密码文件会返回 **500**（不是 401），日志里是
 
 ---
 
+## 卸载
+
+```bash
+# 只拆服务和反代，聊天记录、工作区文件都留着（随时能装回来）
+bash uninstall.sh
+
+# 连数据一起清干净（不可恢复，会二次确认）
+PURGE=1 bash uninstall.sh
+
+# 先看看它会动什么，不实际执行
+DRY_RUN=1 bash uninstall.sh
+```
+
+会依次处理：`dsh.service` → nginx 站点配置 → polyfill/密码文件/token 文件 →
+全局 npm 包 → （可选）`$DSH_HOME` 与工作区。
+
+> 卸载前建议先跑一次 `bash backup.sh`，数据虽然有保留，但备份永远不亏。
+
 ## 其它脚本
 
 | 脚本 | 作用 |
@@ -143,6 +161,7 @@ nginx 读不到密码文件会返回 **500**（不是 401），日志里是
 | [install-qq.sh](install-qq.sh) | 把 dsh 接进 QQ（OneBot / NapCat 那套） |
 | [install-plugins.sh](install-plugins.sh) | 装常用插件 |
 | [doctor.sh](doctor.sh) | 体检：服务、端口、nginx、日志一把梭 |
+| [uninstall.sh](uninstall.sh) | **一键卸载**（默认保留数据，`PURGE=1` 连数据一起删） |
 | [backup.sh](backup.sh) | 备份 `$DSH_HOME` 和工作区 |
 | [REINSTALL.md](REINSTALL.md) | 重装指南 |
 
